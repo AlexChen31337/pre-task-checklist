@@ -6,6 +6,7 @@ Checks memory, reference files, and critical details before starting tasks
 
 import sys
 import os
+import argparse
 import subprocess
 from pathlib import Path
 
@@ -142,15 +143,38 @@ def checklist():
         return 1
 
 if __name__ == "__main__":
-    if len(sys.argv) > 1:
-        if sys.argv[1] == "verify":
-            if len(sys.argv) > 2:
-                quick_verify(sys.argv[2])
-        elif sys.argv[1] == "ip":
-            if len(sys.argv) > 2:
-                verify_ip(sys.argv[2])
-        elif sys.argv[1] == "path":
-            if len(sys.argv) > 2:
-                verify_path(sys.argv[2])
+    parser = argparse.ArgumentParser(description='Pre-task verification utility')
+    parser.add_argument('--check', action='append', metavar='QUERY',
+                        help='Non-interactive: search memory for this term (repeatable)')
+    parser.add_argument('--ip', metavar='HOST', help='Verify SSH connectivity to host')
+    parser.add_argument('--path', metavar='PATH', help='Verify file/dir exists')
+    parser.add_argument('cmd', nargs='?', choices=['verify', 'ip', 'path'])
+    parser.add_argument('arg', nargs='?')
+    args = parser.parse_args()
+
+    if args.check:
+        ref_files = [TOOLS_MD, AGENTS_MD, SOUL_MD, MEMORY_MD]
+        any_found = False
+        for query in args.check:
+            results = search_files(query, ref_files)
+            if results:
+                any_found = True
+                print(f"\n🔍 '{query}':")
+                for fname, lines in results.items():
+                    for line in lines[:3]:
+                        print(f"  [{fname}] {line.strip()}")
+            else:
+                print(f"⚠️  '{query}' not found in reference files")
+        sys.exit(0 if any_found else 1)
+    elif args.ip:
+        verify_ip(args.ip)
+    elif args.path:
+        verify_path(args.path)
+    elif args.cmd == 'verify' and args.arg:
+        quick_verify(args.arg)
+    elif args.cmd == 'ip' and args.arg:
+        verify_ip(args.arg)
+    elif args.cmd == 'path' and args.arg:
+        verify_path(args.arg)
     else:
         checklist()
